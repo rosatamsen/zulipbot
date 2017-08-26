@@ -27,9 +27,9 @@ exports.referenceIssue = (client, referencedIssue, pullRequest, repository) => {
     owner: repoOwner, repo: repoName, number: referencedIssue
   }).then((labels) => {
     const issueLabels = labels.data.filter((l) => {
-      return client.cfg.areaLabels.has(l.name);
+      return client.cfg.issues.areaLabelSystem.areaLabels().has(l.name);
     }).map(l => l.name);
-    const teams = issueLabels.map(l => client.cfg.areaLabels.get(l));
+    const teams = issueLabels.map(l => client.cfg.issues.areaLabelSystem.areaLabels().get(l));
     if (!teams.length) return;
     const uniqueTeams = `@${repoOwner}/` + Array.from(new Set(teams)).join(`, @${repoOwner}/`);
     const areaLabels = issueLabels.join("\", \"");

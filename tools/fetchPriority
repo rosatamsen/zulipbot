@@ -2,9 +2,12 @@
 
 const client = require("../src/client.js");
 
-if (!client.cfg.priorityLabels) console.log("No priority labels were specified in config.js!");
+if (!client.cfg.issues.priorityLabels()) {
+  console.log("No priority labels were specified in config.js!");
+  return;
+}
 
-client.cfg.priorityLabels.forEach(async(label) => {
+client.cfg.issues.priorityLabels().forEach(async(label) => {
   const func = client.issues.getAll({
     filter: "all", state: "open", labels: label, per_page: 100
   });

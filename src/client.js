@@ -1,9 +1,10 @@
 const GitHub = require("github");
 const client = new GitHub();
 const fs = require("fs");
+const nn = require("nevernull");
 const snekfetch = require("snekfetch");
 
-client.cfg = require("./config.js");
+client.cfg = nn(require("./config.js"));
 client.automations = new Map();
 client.commands = new Map();
 client.events = new Map();
@@ -35,8 +36,8 @@ for (const file of automations) {
 
 client.authenticate({
   type: "basic",
-  username: client.cfg.username,
-  password: client.cfg.password
+  username: client.cfg.username(),
+  password: client.cfg.password()
 });
 
 client.newComment = (issue, repository, body, replacePR) => {
@@ -52,13 +53,13 @@ client.abandonIssue = async function(client, commenter, repository, issue) {
   const issueNumber = issue.number;
   const repoName = repository.name;
   const repoOwner = repository.owner.login;
-  const auth = new Buffer(client.cfg.username + ":" + client.cfg.password, "ascii").toString("base64");
+  const auth = new Buffer(client.cfg.username() + ":" + client.cfg.password(), "ascii").toString("base64");
   const json = JSON.stringify({
     assignees: commenter
   });
   await snekfetch.delete(`https://api.github.com/repos/${repoOwner}/${repoName}/issues/${issueNumber}/assignees`)
   .set("content-type", "application/json").set("content-length", json.length).set("authorization", `Basic ${auth}`)
-  .set("accept", "application/json").set("user-agent", client.cfg.username).send(json);
+  .set("accept", "application/json").set("user-agent", client.cfg.username()).send(json);
 };
 
 client.getAll = async function(client, responses, func) {

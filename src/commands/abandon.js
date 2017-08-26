@@ -1,3 +1,5 @@
+const nn = require("nevernull");
+
 exports.run = (client, comment, issue, repository) => {
   const commenter = comment.user.login;
   const assignees = issue.assignees.map(assignee => assignee.login);
@@ -7,5 +9,5 @@ exports.run = (client, comment, issue, repository) => {
   client.abandonIssue(client, commenter, repository, issue);
 };
 
-exports.aliases = require("../config.js").abandonCommands;
+exports.aliases = nn(require("../config.js")).issues.commands.assign.abandon.aliases() || [];
 exports.args = false;

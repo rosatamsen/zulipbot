@@ -1,3 +1,5 @@
+const nn = require("nevernull");
+
 exports.run = (client, body, issue, repository) => {
   const repoName = repository.name;
   const repoOwner = repository.owner.login;
@@ -21,5 +23,5 @@ exports.run = (client, body, issue, repository) => {
   });
 };
 
-exports.aliases = require("../config.js").removeCommands;
+exports.aliases = nn(require("../config.js")).issues.commands.label.remove.aliases() || [];
 exports.args = true;

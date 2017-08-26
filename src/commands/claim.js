@@ -1,3 +1,5 @@
+const nn = require("nevernull");
+
 exports.run = (client, comment, issue, repository) => {
   const commenter = comment.user.login;
   const repoName = repository.name;
@@ -24,12 +26,13 @@ exports.addCollaborator = (client, comment, issue, repository) => {
   const commenter = comment.user.login;
   const repoName = repository.name;
   const repoOwner = repository.owner.login;
-  if (!client.cfg.addCollabPermission) {
-    const comment = "**ERROR:** `client.cfg.addCollabPermission` wasn't specified in `src/config.js`.";
+  const collab = client.cfg.issues.commands.assign.claim.permission();
+  if (!collab) {
+    const comment = "**ERROR:** `claim.permission` wasn't specified in `src/config.js`.";
     return client.newComment(issue, repository, comment);
   }
   client.repos.addCollaborator({
-    owner: repoOwner, repo: repoName, username: commenter, permission: client.cfg.addCollabPermission
+    owner: repoOwner, repo: repoName, username: commenter, permission: collab
   }).then(() => exports.claimIssue(client, comment, issue, repository, true));
 };
 
@@ -49,5 +52,5 @@ exports.claimIssue = (client, comment, issue, repository, newContrib) => {
   });
 };
 
-exports.aliases = require("../config.js").claimCommands;
+exports.aliases = nn(require("../config.js")).issues.commands.assign.claim.aliases() || [];
 exports.args = false;

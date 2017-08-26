@@ -4,7 +4,7 @@ const client = require("../src/client.js");
 const dateFormat = require("dateformat");
 
 Promise.all(
-  client.cfg.activeRepos.reduce((all, repo) => {
+  client.cfg.inactivity.activeRepos().reduce((all, repo) => {
     const repoOwner = repo.split("/")[0];
     const repoName = repo.split("/")[1];
     const func = client.pullRequests.getAll({
@@ -21,7 +21,7 @@ Promise.all(
 
 async function scrapeInactivePullRequests(client, pullRequests) {
   const references = new Map();
-  const ims = client.cfg.inactivityTimeLimit * 86400000;
+  const ims = client.cfg.inactivity.inactivityTimeLimit() * 86400000;
   if (!pullRequests.length) return;
   pullRequests.forEach(async(pullRequest, index, array) => {
     setTimeout(async() => {
@@ -35,14 +35,14 @@ async function scrapeInactivePullRequests(client, pullRequests) {
         const labels = await client.issues.getIssueLabels({
           owner: repoOwner, repo: repoName, number: number
         });
-        const inactiveLabel = labels.data.find(l => l.name === client.cfg.inactiveLabel);
+        const inactiveLabel = labels.data.find(l => l.name === client.cfg.inactivity.inactiveLabel());
         if (inactiveLabel) return;
-        const reviewedLabel = labels.data.find(l => l.name === client.cfg.reviewedLabel);
-        const needsReviewLabel = labels.data.find(l => l.name === client.cfg.needsReviewLabel);
+        const nRLabel = labels.data.find(l => l.name === client.cfg.inactivity.pullRequests.needsReview.label());
+        const reviewedLabel = labels.data.find(l => l.name === client.cfg.inactivity.pullRequests.reviewed.label());
         if (reviewedLabel) {
           console.log(`\n* PR [${pullRequest.title} (#${number})](${pullRequest.html_url}) **was warned to update.**`,
             `\nAuthor: ${author} Last updated: ${dateFormat(time, "UTC:dddd, mmmm dS, yyyy, h:MM TT")}.`);
-        } else if (needsReviewLabel) {
+        } else if (nRLabel) {
           console.log(`\n* PR [${pullRequest.title} (#${number})](${pullRequest.html_url}) **needs a review.**`,
             `\nAuthor: ${author} Last updated: ${dateFormat(time, "UTC:dddd, mmmm dS, yyyy, h:MM TT")}.`);
         } else {
@@ -63,7 +63,7 @@ async function scrapeInactivePullRequests(client, pullRequests) {
       }
       if (index !== array.length - 1) return;
       const func = client.issues.getAll({
-        filter: "all", labels: client.cfg.inProgressLabel, per_page: 100
+        filter: "all", labels: client.cfg.inactivity.issues.inProgressLabel(), per_page: 100
       });
       const issues = await client.getAll(client, [], func);
       await scrapeInactiveIssues(client, references, issues);
@@ -72,11 +72,11 @@ async function scrapeInactivePullRequests(client, pullRequests) {
 }
 
 async function scrapeInactiveIssues(client, references, issues) {
-  const ms = client.cfg.autoAbandonTimeLimit * 86400000;
-  const ims = client.cfg.inactivityTimeLimit * 86400000;
+  const ms = client.cfg.inactivity.autoAbandonTimeLimit() * 86400000;
+  const ims = client.cfg.inactivity.inactivityTimeLimit() * 86400000;
   issues.forEach(async(issue, index) => {
     setTimeout(async() => {
-      const inactiveLabel = issue.labels.find(label => label.name === client.cfg.inactiveLabel);
+      const inactiveLabel = issue.labels.find(label => label.name === client.cfg.inactivity.inactiveLabel());
       if (inactiveLabel) return;
       let time = Date.parse(issue.updated_at);
       const issueNumber = issue.number;
@@ -85,28 +85,28 @@ async function scrapeInactiveIssues(client, references, issues) {
       if (time < references.get(`${repoName}/${issueNumber}`)) {
         time = references.get(`${repoName}/${issueNumber}`);
       }
-      if (time + ms >= Date.now() || !client.cfg.activeRepos.includes(`${repoOwner}/${repoName}`)) return;
-      const issueComments = await client.issues.getComments({
-        owner: repoOwner, repo: repoName, number: issueNumber, per_page: 100
-      });
-      const assigneeString = issue.assignees.map(assignee => assignee.login).join(", @");
-      if (!assigneeString) {
+      if (time + ms >= Date.now() || !client.cfg.inactivity.activeRepos().includes(`${repoOwner}/${repoName}`)) return;
+      const aString = issue.assignees.map(assignee => assignee.login).join(", @");
+      if (!aString) {
         return console.log(`* Issue [${issue.title} (#${issueNumber})](${issue.html_url}) was labeled as`,
           "being in progress but has no assignee");
       }
+      const issueComments = await client.issues.getComments({
+        owner: repoOwner, repo: repoName, number: issueNumber, per_page: 100
+      });
       const c = client.templates.get("inactiveWarning")
-      .replace("[assignee]", assigneeString)
-      .replace("[inactive]", client.cfg.inactiveTimeLimit)
-      .replace("[abandon]", client.cfg.autoAbandonTimeLimit)
-      .replace("[username]", client.cfg.username);
+      .replace("[assignee]", aString)
+      .replace("[inactive]", client.cfg.inactivity.inactivityTimeLimit())
+      .replace("[abandon]", client.cfg.inactivity.autoAbandonTimeLimit())
+      .replace("[username]", client.cfg.username());
       const com = issueComments.data.slice(-1).pop();
-      const labelComment = com ? com.body.includes(c) && com.user.login === client.cfg.username : false;
+      const labelComment = com ? com.body.includes(c) && com.user.login === client.cfg.username() : false;
       if (labelComment) {
         console.log(`* Issue [${issue.title} (#${issueNumber})](${issue.html_url}) **was abandoned**\n`,
-          `Assignee(s): ${assigneeString} Last updated: ${dateFormat(time, "UTC:dddd, mmmm dS, yyyy, h:MM TT")}.\n`);
+          `Assignee(s): ${aString} Last updated: ${dateFormat(time, "UTC:dddd, mmmm dS, yyyy, h:MM TT")}.\n`);
       } else if (!labelComment && time + ims <= Date.now()) {
         console.log(`* Issue [${issue.title} (#${issueNumber})](${issue.html_url}) **is inactive**\n`,
-          `Assignee(s): ${assigneeString} Last updated: ${dateFormat(time, "UTC:dddd, mmmm dS, yyyy, h:MM TT")}.\n`);
+          `Assignee(s): ${aString} Last updated: ${dateFormat(time, "UTC:dddd, mmmm dS, yyyy, h:MM TT")}.\n`);
       }
     }, index * 500);
   });

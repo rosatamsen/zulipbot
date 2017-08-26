@@ -6,27 +6,27 @@ exports.run = (client, payload) => {
   const repoName = repository.name;
   const repoOwner = repository.owner.login;
   const review = payload.review;
-  if (client.cfg.reviewedLabel && client.cfg.needsReviewLabel) {
+  if (client.cfg.inactivity.pullRequests()) {
     exports.managePRLabels(client, action, pullRequest, review, repository);
   }
-  if (action === "submitted" && client.cfg.pullRequestsAssignee) {
+  if (action === "submitted" && client.cfg.inactivity.pullRequests.reviewed.assignee()) {
     client.issues.addAssigneesToIssue({
       owner: repoOwner, repo: repoName, number: number, assignees: [review.user.login]
     });
-  } else if (action === "labeled" && client.cfg.areaLabels) {
+  } else if (action === "labeled" && client.cfg.issues.areaLabelSystem()) {
     client.issues.get({
       owner: repoOwner, repo: repoName, number: number
     }).then((response) => {
       client.automations.get("areaLabel").run(client, response.data, repository, payload.label);
     });
-  } else if (!client.cfg.areaLabels || !client.cfg.commitReferenceEnabled) {
+  } else if (!client.cfg.issues.areaLabelSystem() || !client.cfg.issues.commitReferences()) {
     return;
   }
-  if (action === "opened" && !pullRequest.title.includes(client.cfg.escapeWIPString)) {
+  if (action === "opened" && !pullRequest.title.includes(client.cfg.pullRequests.escapeWIPString())) {
     client.automations.get("issueReferenced").run(client, pullRequest, repository, true);
   } else if (action === "synchronize") {
     client.automations.get("issueReferenced").run(client, pullRequest, repository, false);
-    if (client.cfg.checkMergeConflicts) {
+    if (client.cfg.pullRequests.checkMergeConflicts()) {
       client.automations.get("checkMergeConflicts").check(client, number, repoName, repoOwner);
     }
   }
@@ -40,18 +40,20 @@ exports.managePRLabels = (client, action, pullRequest, review, repository) => {
     owner: repoOwner, repo: repoName, number: number
   }).then((response) => {
     let labels = response.data.map(label => label.name);
-    const needsReview = labels.includes(client.cfg.needsReviewLabel);
-    const reviewed = labels.includes(client.cfg.reviewedLabel);
+    const reviewedLabel = client.cfg.inactivity.pullRequests.reviewed.label();
+    const needsReviewLabel = client.cfg.inactivity.pullRequests.needsReview.label();
+    const n = labels.includes(needsReviewLabel);
+    const r = labels.includes(reviewedLabel);
     if (action === "opened" || action === "reopened") {
-      labels.push(client.cfg.needsReviewLabel);
-    } else if (action === "submitted" && needsReview && review.user.login !== pullRequest.user.login) {
-      labels[labels.indexOf(client.cfg.needsReviewLabel)] = client.cfg.reviewedLabel;
-    } else if (action === "synchronize" && reviewed) {
-      labels[labels.indexOf(client.cfg.reviewedLabel)] = client.cfg.needsReviewLabel;
-    } else if (action === "closed" && reviewed) {
-      labels.splice(labels.indexOf(client.cfg.reviewedLabel), 1);
-    } else if (action === "closed" && needsReview) {
-      labels.splice(labels.indexOf(client.cfg.needsReviewLabel), 1);
+      labels.push(needsReviewLabel);
+    } else if (action === "submitted" && n && review.user.login !== pullRequest.user.login) {
+      labels[labels.indexOf(needsReviewLabel)] = reviewedLabel;
+    } else if (action === "synchronize" && r) {
+      labels[labels.indexOf(reviewedLabel)] = needsReviewLabel;
+    } else if (action === "closed" && r) {
+      labels.splice(labels.indexOf(reviewedLabel), 1);
+    } else if (action === "closed" && n) {
+      labels.splice(labels.indexOf(needsReviewLabel), 1);
     } else {
       return;
     }

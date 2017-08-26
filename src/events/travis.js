@@ -1,12 +1,13 @@
 exports.run = (client, payload) => {
-  if (!payload.pull_request || !client.cfg.travisLabel) return;
+  const travisLabel = client.cfg.pullRequests.travisLabel();
+  if (!payload.pull_request || !travisLabel) return;
   const repoOwner = payload.repository.owner_name;
   const repoName = payload.repository.name;
   const number = payload.pull_request_number;
   client.issues.getIssueLabels({
     owner: repoOwner, repo: repoName, number: number
   }).then((labels) => {
-    const labelCheck = labels.data.find(label => label.name === client.cfg.travisLabel);
+    const labelCheck = labels.data.find(label => label.name === travisLabel);
     if (!labelCheck) return;
     const state = payload.state;
     const buildURL = payload.build_url;

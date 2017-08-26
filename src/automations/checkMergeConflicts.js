@@ -24,7 +24,7 @@ exports.check = async function(client, number, repoName, repoOwner) {
     owner: repoOwner, repo: repoName, number: number, per_page: 100
   });
   const warnings = comments.data.filter((c) => {
-    return c.body.includes(comment) && c.user.login === client.cfg.username;
+    return c.body.includes(comment) && c.user.login === client.cfg.username();
   });
   if (mergeable && warnings.length) {
     warnings.forEach((c) => {
@@ -41,7 +41,7 @@ exports.check = async function(client, number, repoName, repoOwner) {
     const labels = await client.issues.get({
       owner: repoOwner, repo: repoName, number: number
     });
-    const inactive = labels.data.find(l => l.name === client.cfg.inactiveLabel);
+    const inactive = labels.data.find(l => l.name === client.cfg.inactivity.inactiveLabel());
     if (!labelComment && !inactive) client.newComment(pull.data, pull.data.base.repo, comment);
   }
 };
